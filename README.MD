@@ -74,7 +74,7 @@ docker-compose up -d
 docker exec pg-node1 patronictl -c /etc/patroni/patroni.yml list
 ```
 Expected output:
-```shell
+```
 + Cluster: pgcluster (7539919637780119581) -+----+-----------+
 | Member   | Host     | Role    | State     | TL | Lag in MB |
 +----------+----------+---------+-----------+----+-----------+
