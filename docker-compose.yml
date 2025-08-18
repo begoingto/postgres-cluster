@@ -51,9 +51,9 @@ services:
       - postgres_network
     depends_on:
       - etcd
-    ports:
-      - "5436:5432"   # Optional local access
-      - "8008:8008"   # Patroni REST API (node1)
+    # ports:
+    #   - "5436:5432"   # Optional local access
+    #   - "8008:8008"   # Patroni REST API (node1)
 
   pg-node2:
     image: ghcr.io/begoingto/postgres-cluster:node
@@ -113,11 +113,11 @@ services:
       - "5438:5000"   # Write (primary)
       - "5001:5001"   # Read-only pool
       - "7000:7000"   # HAProxy stats
+      - "8008:8008"   # Patroni API
     volumes:
       - ./haproxy/haproxy.cfg:/usr/local/etc/haproxy/haproxy.cfg:ro
     networks:
       - postgres_network
-
 
 networks:
   postgres_network:
