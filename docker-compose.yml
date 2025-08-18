@@ -33,7 +33,6 @@ services:
     container_name: pg-node1
     hostname: pg-node1
     user: postgres
-    # privileged: true
     environment:
       NODE_NAME: pg-node1
       PATRONI_SCOPE: pgcluster
@@ -62,7 +61,6 @@ services:
       context: ./patroni-node
     container_name: pg-node2
     hostname: pg-node2
-    # privileged: true
     user: postgres
     environment:
       NODE_NAME: pg-node2
@@ -76,7 +74,6 @@ services:
       TZ: UTC
     volumes:
       - data_node2:/var/lib/postgresql/data
-      - data_node1:/var/lib/postgresql/data/postmaster.opts:/var/lib/postgresql/data/postmaster.opts
       - ./shared/archive:/var/lib/postgresql/archive
     networks:
       - postgres_network
@@ -84,25 +81,29 @@ services:
       - etcd
       - pg-node1
   
-  # node3:
-  #   image: postgres:17.5-bullseye
-  #   container_name: postgres_primary
-  #   environment:
-  #     - POSTGRES_USER=${POSTGRES_USER}
-  #     - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
-  #     - POSTGRES_DB=${POSTGRES_DB}
-  #   ports:
-  #     - "5439:5432"
-  #   volumes:
-  #     - data_node3:/var/lib/postgresql/data
-  #     - ./init-primary.sql:/docker-entrypoint-initdb.d/00_init.sql
-  #   networks:
-  #     - postgres_network
-  #   healthcheck:
-  #     test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER}"]
-  #     interval: 10s
-  #     timeout: 5s
-  #     retries: 5
+  pg-node3:
+    build:
+      context: ./patroni-node
+    container_name: pg-node3
+    user: postgres
+    environment:
+      NODE_NAME: pg-node3
+      PATRONI_SCOPE: pgcluster
+      ETCD_NODES: etcd:2379
+      POSTGRESQL_DATA_DIR: /var/lib/postgresql/data
+      SUPERUSER_PASSWORD: super_password
+      REPLICATION_PASSWORD: repl_password
+      APP_USER: app
+      APP_PASSWORD: app_password
+      TZ: UTC
+    volumes:
+      - data_node3:/var/lib/postgresql/data
+      - ./shared/archive:/var/lib/postgresql/archive
+    networks:
+      - postgres_network
+    depends_on:
+      - etcd
+      - pg-node1
 
   # node4:
   #   image: postgres:17.5-bullseye
@@ -130,6 +131,7 @@ services:
     depends_on:
       - pg-node1
       - pg-node2
+      - pg-node3
     ports:
       - "5438:5000"   # Write (primary)
       - "5001:5001"   # Read-only pool
