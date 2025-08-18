@@ -1,6 +1,7 @@
-name: Deploy React App to Server with Bun
+name: Deploy docker build postgresql NODE
 
 on: 
+  workflow_dispatch:
   push:
     branches:
       - main
@@ -44,9 +45,7 @@ jobs:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
           tags: |
             type=raw,value=node
-            type=ref,event=branch
-            type=ref,event=tag
-            type=sha
+            type=ref,value=cache-node
 
       - name: Build and push Docker image
         uses: docker/build-push-action@v6
@@ -57,5 +56,5 @@ jobs:
           push: ${{ github.event_name != 'pull_request' }} 
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          cache-from: type=registry,ref=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:cache-node
+          cache-to: type=registry,ref=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:cache-node,mode=max
