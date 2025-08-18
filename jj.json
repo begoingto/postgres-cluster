@@ -1,0 +1,27 @@
+{
+    "ttl": 30,
+    "loop_wait": 10,
+    "retry_timeout": 10,
+    "postgresql": {
+        "use_pg_rewind": true,
+        "use_slots": true,
+        "parameters": {
+            "wal_level": "replica",
+            "hot_standby": "on",
+            "max_wal_senders": 20,
+            "max_replication_slots": 20,
+            "wal_keep_size": "512MB",
+            "shared_buffers": "256MB",
+            "random_page_cost": 1.1,
+            "effective_cache_size": "768MB"
+        },
+        "pg_hba": [
+            "local   all             all                                     md5",
+            "host    all             all             127.0.0.1/32            md5",
+            "host    all             all             ::1/128                 md5",
+            "host    all             all             172.25.0.0/16           md5",
+            "host    all             all             0.0.0.0/16              md5",
+            "host    replication     replicator      172.25.0.0/16           md5"
+        ]
+    }
+}

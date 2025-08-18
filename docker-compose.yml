@@ -1,122 +1,157 @@
 services:
-  postgres_primary:
-    image: postgres:17.5-bullseye
-    container_name: postgres_primary
-    environment:
-      - POSTGRES_USER=${POSTGRES_USER:-postgres}
-      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-postgres}
-      - POSTGRES_DB=${POSTGRES_DB:-postgres}
-    ports:
-      - "5437:5432"
+  etcd:
+    image: quay.io/coreos/etcd:v3.5.15
+    container_name: etcd
+    # privileged: true
+    command: >
+      /usr/local/bin/etcd
+      --name etcd
+      --data-dir /etcd-data
+      --listen-peer-urls http://0.0.0.0:2380
+      --initial-advertise-peer-urls http://etcd:2380
+      --listen-client-urls http://0.0.0.0:2379
+      --advertise-client-urls http://etcd:2379
+      --initial-cluster-token etcd-single
+      --initial-cluster etcd=http://etcd:2380
+      --initial-cluster-state new
     volumes:
-      - primary_data:/var/lib/postgresql/data
-      - ./init-primary.sql:/docker-entrypoint-initdb.d/00_init.sql
+      - data_etcd:/etcd-data
     networks:
       - postgres_network
-    command: >
-      postgres
-      -c wal_level=replica
-      -c max_wal_senders=10
-      -c max_replication_slots=10
-      -c listen_addresses=*
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres}"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-    # restart: unless-stopped
+    
+  etcd_ui:
+    image: tzfun/etcd-workbench:latest
+    container_name: etcd_ui
+    ports:
+      - "8002:8002"
+    networks:
+      - postgres_network
 
-  postgres_replica1:
-    image: postgres:17.5-bullseye
-    container_name: postgres_replica1
+  pg-node1:
+    build:
+      context: ./patroni-node
+    container_name: pg-node1
+    hostname: pg-node1
+    user: postgres
+    # privileged: true
     environment:
-      - POSTGRES_USER=${POSTGRES_USER:-postgres}
-      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-postgres}
-      - POSTGRES_DB=${POSTGRES_DB:-postgres}
-    ports:
-      - "5438:5432"
+      NODE_NAME: pg-node1
+      PATRONI_SCOPE: pgcluster
+      ETCD_NODES: etcd:2379
+      POSTGRESQL_DATA_DIR: /var/lib/postgresql/data
+      SUPERUSER_PASSWORD: super_password
+      REPLICATION_PASSWORD: repl_password
+      APP_USER: app
+      APP_PASSWORD: app_password
+      TZ: UTC
     volumes:
-      - replica1_data:/var/lib/postgresql/data
+      - data_node1:/var/lib/postgresql/data
+      - ./primary/init:/docker-entrypoint-initdb.d
+      - ./primary/postgresql.primary.conf:/etc/postgresql/postgresql.primary.conf:ro
+      - ./shared/archive:/var/lib/postgresql/archive
     networks:
       - postgres_network
-    command: >
-      bash -c "
-        until pg_isready -h postgres_primary -p 5432 -U ${POSTGRES_USER:-postgres}; do
-          echo 'Waiting for primary...'; sleep 1;
-        done;
-        rm -rf /var/lib/postgresql/data/*;
-        pg_basebackup -h postgres_primary -D /var/lib/postgresql/data -U ${POSTGRES_USER:-postgres} -P -R;
-        postgres
-      "
     depends_on:
-      - postgres_primary
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres}"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-    # restart: unless-stopped
+      - etcd
+    ports:
+      - "5436:5432"   # Optional local access
+      - "8008:8008"   # Patroni REST API (node1)
 
-  postgres_replica2:
-    image: postgres:17.5-bullseye
-    container_name: postgres_replica2
+  pg-node2:
+    build:
+      context: ./patroni-node
+    container_name: pg-node2
+    hostname: pg-node2
+    # privileged: true
+    user: postgres
     environment:
-      - POSTGRES_USER=${POSTGRES_USER:-postgres}
-      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-postgres}
-      - POSTGRES_DB=${POSTGRES_DB:-postgres}
-    ports:
-      - "5439:5432"
+      NODE_NAME: pg-node2
+      PATRONI_SCOPE: pgcluster
+      ETCD_NODES: etcd:2379
+      POSTGRESQL_DATA_DIR: /var/lib/postgresql/data
+      SUPERUSER_PASSWORD: super_password
+      REPLICATION_PASSWORD: repl_password
+      APP_USER: app
+      APP_PASSWORD: app_password
+      TZ: UTC
     volumes:
-      - replica2_data:/var/lib/postgresql/data
+      - data_node2:/var/lib/postgresql/data
+      - data_node1:/var/lib/postgresql/data/postmaster.opts:/var/lib/postgresql/data/postmaster.opts
+      - ./shared/archive:/var/lib/postgresql/archive
     networks:
       - postgres_network
-    command: >
-      bash -c "
-        until pg_isready -h postgres_primary -p 5432 -U ${POSTGRES_USER:-postgres}; do
-          echo 'Waiting for primary...'; sleep 1;
-        done;
-        rm -rf /var/lib/postgresql/data/*;
-        pg_basebackup -h postgres_primary -D /var/lib/postgresql/data -U ${POSTGRES_USER:-postgres} -P -R;
-        postgres
-      "
     depends_on:
-      - postgres_primary
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres}"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-    # restart: unless-stopped
+      - etcd
+      - pg-node1
+  
+  # node3:
+  #   image: postgres:17.5-bullseye
+  #   container_name: postgres_primary
+  #   environment:
+  #     - POSTGRES_USER=${POSTGRES_USER}
+  #     - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+  #     - POSTGRES_DB=${POSTGRES_DB}
+  #   ports:
+  #     - "5439:5432"
+  #   volumes:
+  #     - data_node3:/var/lib/postgresql/data
+  #     - ./init-primary.sql:/docker-entrypoint-initdb.d/00_init.sql
+  #   networks:
+  #     - postgres_network
+  #   healthcheck:
+  #     test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER}"]
+  #     interval: 10s
+  #     timeout: 5s
+  #     retries: 5
+
+  # node4:
+  #   image: postgres:17.5-bullseye
+  #   container_name: postgres_primary
+  #   environment:
+  #     - POSTGRES_USER=${POSTGRES_USER}
+  #     - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+  #     - POSTGRES_DB=${POSTGRES_DB}
+  #   ports:
+  #     - "5436:5432"
+  #   volumes:
+  #     - data_node4:/var/lib/postgresql/data
+  #     - ./init-primary.sql:/docker-entrypoint-initdb.d/00_init.sql
+  #   networks:
+  #     - postgres_network
+  #   healthcheck:
+  #     test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER}"]
+  #     interval: 10s
+  #     timeout: 5s
+  #     retries: 5
 
   haproxy:
-    image: haproxy:2.8
-    container_name: haproxy
-    volumes:
-      - ./haproxy.cfg:/usr/local/etc/haproxy/haproxy.cfg:ro
+    image: haproxy:2.9
+    container_name: pg-haproxy
+    depends_on:
+      - pg-node1
+      - pg-node2
     ports:
-      - "5435:5435"  # Client connections
-      - "8080:8080"  # Stats interface
+      - "5438:5000"   # Write (primary)
+      - "5001:5001"   # Read-only pool
+      - "7000:7000"   # HAProxy stats
+    volumes:
+      - ./haproxy/haproxy.cfg:/usr/local/etc/haproxy/haproxy.cfg:ro
     networks:
       - postgres_network
-    depends_on:
-      - postgres_primary
-      - postgres_replica1
-      - postgres_replica2
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8080/stats"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-    # restart: unless-stopped
 
-volumes:
-  primary_data:
-    driver: local
-  replica1_data:
-    driver: local
-  replica2_data:
-    driver: local
 
 networks:
   postgres_network:
     driver: bridge
+
+volumes:
+  data_etcd: 
+    driver: local
+  data_node1:
+    driver: local
+  data_node2:
+    driver: local
+  data_node3:
+    driver: local
+  data_node4:
+    driver: local

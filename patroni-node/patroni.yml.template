@@ -1,0 +1,69 @@
+scope: ${PATRONI_SCOPE}
+name: ${NODE_NAME}
+
+restapi:
+  listen: 0.0.0.0:8008
+  connect_address: ${NODE_NAME}:8008
+
+etcd3:
+  hosts: ${ETCD_NODES}
+
+bootstrap:
+  dcs:
+    ttl: 30
+    loop_wait: 10
+    retry_timeout: 10
+    postgresql:
+      use_pg_rewind: true
+      use_slots: true
+      parameters:
+        wal_level: replica
+        hot_standby: "on"
+        max_wal_senders: 20
+        max_replication_slots: 20
+        wal_keep_size: 512MB
+        shared_buffers: 256MB
+        random_page_cost: 1.1
+        effective_cache_size: 768MB
+      pg_hba:
+        - local   all             all                                     md5
+        - host    all             all             127.0.0.1/32            md5
+        - host    all             all             ::1/128                 md5
+        - host    all             all             172.25.0.0/16           md5
+        - host    all             all             0.0.0.0/0               md5
+        - host    replication     replicator      172.25.0.0/16           md5
+  initdb:
+    - auth-host: md5
+    - auth-local: md5
+    - encoding: UTF8
+    - data-checksums
+  users:
+    ${APP_USER}:
+      password: ${APP_PASSWORD}
+      options:
+        - LOGIN
+        - CREATEDB
+
+postgresql:
+  listen: 0.0.0.0:5432
+  connect_address: ${NODE_NAME}:5432
+  data_dir: ${POSTGRESQL_DATA_DIR}
+  bin_dir: /usr/lib/postgresql/17/bin
+  authentication:
+    superuser:
+      username: postgres
+      password: ${SUPERUSER_PASSWORD}
+    replication:
+      username: replicator
+      password: ${REPLICATION_PASSWORD}
+    rewind:
+      username: rewind
+      password: ${REPLICATION_PASSWORD}
+  parameters:
+    unix_socket_directories: '/var/run/postgresql'
+    log_destination: 'stderr'
+    logging_collector: 'on'
+    log_line_prefix: '%m [%p] %u %d %r '
+tags:
+  noloadbalance: false
+  clonefrom: false
