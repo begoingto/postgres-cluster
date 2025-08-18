@@ -4,6 +4,10 @@ on:
   push:
     branches:
       - main
+    paths:
+      - 'patroni-node/**'
+      - 'primary/**'
+      - 'shared/**'
 
 env:
   REGISTRY: ghcr.io
