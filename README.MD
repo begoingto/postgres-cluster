@@ -22,7 +22,7 @@ This project provides a Docker Compose setup for a high-availability (HA) Postgr
 - **Hardware**: At least 4GB RAM and 8 CPU cores for a 3-node setup.
 
 ## Directory Structure
-```shell
+```
 .
 ├── connect.sh
 ├── docker-compose.yml
