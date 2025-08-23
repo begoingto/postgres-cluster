@@ -18,7 +18,7 @@ services:
       - data_etcd:/etcd-data
     networks:
       - postgres_network
-    
+
   etcd_ui:
     image: tzfun/etcd-workbench:latest
     container_name: etcd_ui
@@ -78,7 +78,7 @@ services:
     depends_on:
       - etcd
       - pg-node1
-  
+
   pg-node3:
     image: ghcr.io/begoingto/postgres-cluster:node
     container_name: pg-node3
@@ -110,10 +110,10 @@ services:
       - pg-node2
       - pg-node3
     ports:
-      - "5438:5000"   # Write (primary)
-      - "5001:5001"   # Read-only pool
-      - "7000:7000"   # HAProxy stats
-      - "8008:8008"   # Patroni API
+      - "5438:5000" # Write (primary)
+      - "5001:5001" # Read-only pool
+      - "7001:7000" # HAProxy stats
+      - "8008:8008" # Patroni API
     volumes:
       - ./haproxy/haproxy.cfg:/usr/local/etc/haproxy/haproxy.cfg:ro
     networks:
@@ -124,7 +124,7 @@ networks:
     driver: bridge
 
 volumes:
-  data_etcd: 
+  data_etcd:
     driver: local
   data_node1:
     driver: local
